@@ -30,7 +30,7 @@ def sendMessage(id, msg):
 	except: pass
 
 def pollEvents(id, events):
-	cb = cleverbot.Session()
+	cb = cleverbot.Cleverbot()
 	lastMessage = time.time()
 	
 	while 1:
@@ -69,9 +69,10 @@ def pollEvents(id, events):
 				# respond
 				try:
 					typing(id)
-					outgoingMsg = cb.Ask(incomingMsg)
+					outgoingMsg = cb.ask(incomingMsg)
 					sendMessage(id, outgoingMsg)
-				except:
+				except Exception as e:
+					log(str(e))
 					sendMessage(id, "Huh?!")	# something went wrong with cleverbot (timeout, whatever)
 					
 				lastMessage = time.time()

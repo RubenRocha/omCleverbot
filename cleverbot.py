@@ -1,116 +1,160 @@
-#!/usr/bin/python
-"""
-This library lets you open chat session with cleverbot (www.cleverbot.com)
+"""Python library allowing interaction with the Cleverbot API."""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+from builtins import str  # pylint: disable=redefined-builtin
+from builtins import object  # pylint: disable=redefined-builtin
 
-Example of how to use the bindings:
-
->>> import cleverbot
->>> cb=cleverbot.Session()
->>> print cb.Ask("Hello there")
-'Hello.'
-
-"""
-
-import urllib2
 import hashlib
-import re
+import requests
+from requests.compat import urlencode
+from future.backports.html import parser
 
-class ServerFullError(Exception):
-        pass
-
-ReplyFlagsRE = re.compile('<INPUT NAME=(.+?) TYPE=(.+?) VALUE="(.*?)">', re.IGNORECASE | re.MULTILINE)
-
-class Session(object):
-        keylist=['stimulus','start','sessionid','vText8','vText7','vText6','vText5','vText4','vText3','vText2','icognoid','icognocheck','prevref','emotionaloutput','emotionalhistory','asbotname','ttsvoice','typing','lineref','fno','sub','islearning','cleanslate']
-        headers={}
-        headers['User-Agent']='Mozilla/5.0 (Windows NT 6.1; WOW64; rv:7.0.1) Gecko/20100101 Firefox/7.0'
-        headers['Accept']='text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        headers['Accept-Language']='en-us;q=0.8,en;q=0.5'
-        headers['X-Moz']='prefetch'
-        headers['Accept-Charset']='ISO-8859-1,utf-8;q=0.7,*;q=0.7'
-        headers['Referer']='http://www.cleverbot.com'
-        headers['Cache-Control']='no-cache, no-cache'
-        headers['Pragma']='no-cache'
-
-        def __init__(self):
-                self.arglist=['','y','','','','','','','','','wsf','','','','','','','','','0','Say','1','false']
-                self.MsgList=[]
-
-        def Send(self):
-                data=encode(self.keylist,self.arglist)
-                digest_txt=data[9:29]
-                hash=hashlib.md5(digest_txt).hexdigest()
-                self.arglist[self.keylist.index('icognocheck')]=hash
-                data=encode(self.keylist,self.arglist)
-                req=urllib2.Request("http://www.cleverbot.com/webservicemin",data,self.headers)
-                f=urllib2.urlopen(req)
-                reply=f.read()
-                return reply
-
-        def Ask(self,q):
-                self.arglist[self.keylist.index('stimulus')]=q
-                if self.MsgList: self.arglist[self.keylist.index('lineref')]='!0'+str(len(self.MsgList)/2)
-                asw=self.Send()
-                self.MsgList.append(q)
-                answer = parseAnswers(asw)
-                for k,v in answer.iteritems():
-                        try:
-                                self.arglist[self.keylist.index(k)] = v
-                        except ValueError:
-                                pass
-                self.arglist[self.keylist.index('emotionaloutput')]=''
-                text = answer['ttsText']
-                self.MsgList.append(text)
-                return text
-
-def parseAnswers(text):
-        d = {}
-        keys = ["text", "sessionid", "logurl", "vText8", "vText7", "vText6", "vText5", "vText4", "vText3",
-                        "vText2", "prevref", "foo", "emotionalhistory", "ttsLocMP3", "ttsLocTXT",
-                        "ttsLocTXT3", "ttsText", "lineRef", "lineURL", "linePOST", "lineChoices",
-                        "lineChoicesAbbrev", "typingData", "divert"]
-        values = text.split("\r")
-        i = 0
-        for key in keys:
-                d[key] = values[i]
-                i += 1
-        return d
-
-def encode(keylist,arglist):
-        text=''
-        for i in range(len(keylist)):
-                k=keylist[i]; v=quote(arglist[i])
-                text+='&'+k+'='+v
-        text=text[1:]
-        return text
-
-always_safe = ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-               'abcdefghijklmnopqrstuvwxyz'
-               '0123456789' '_.-')
-def quote(s, safe = '/'):   #quote('abc def') -> 'abc%20def'
-        safe += always_safe
-        safe_map = {}
-        for i in range(256):
-                c = chr(i)
-                safe_map[c] = (c in safe) and c or  ('%%%02X' % i)
-        res = map(safe_map.__getitem__, s)
-        return ''.join(res)
+# Only use the instance method `unescape` of entity_parser. (I wish it was a
+# static method or public function; it never uses `self` anyway)
+entity_parser = parser.HTMLParser()
 
 
-def main():
-        import sys
-        cb = Session()
+class Cleverbot(object):
+    """
+    Wrapper over the Cleverbot API.
 
-        q = ''
-        while q != 'bye':
-                try:
-                        q = raw_input("> ")
-                except KeyboardInterrupt:
-                        print
-                        sys.exit()
-                print cb.Ask(q)
+    """
+    HOST = "www.cleverbot.com"
+    PROTOCOL = "http://"
+    RESOURCE = "/webservicemin"
+    API_URL = PROTOCOL + HOST + RESOURCE
 
-if __name__ == "__main__":
-        main()
+    headers = {
+        'User-Agent': 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0)',
+        'Accept': 'text/html,application/xhtml+xml,'
+                  'application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
+        'Accept-Language': 'en-us,en;q=0.8,en-us;q=0.5,en;q=0.3',
+        'Cache-Control': 'no-cache',
+        'Host': HOST,
+        'Referer': PROTOCOL + HOST + '/',
+        'Pragma': 'no-cache'
+    }
+
+    def __init__(self):
+        """ The data that will get passed to Cleverbot's web API """
+        self.data = {
+            'stimulus': '',
+            'start': 'y',  # Never modified
+            'sessionid': '',
+            'vText8': '',
+            'vText7': '',
+            'vText6': '',
+            'vText5': '',
+            'vText4': '',
+            'vText3': '',
+            'vText2': '',
+            'icognoid': 'wsf',  # Never modified
+            'icognocheck': '',
+            'fno': 0,  # Never modified
+            'prevref': '',
+            'emotionaloutput': '',  # Never modified
+            'emotionalhistory': '',  # Never modified
+            'asbotname': '',  # Never modified
+            'ttsvoice': '',  # Never modified
+            'typing': '',  # Never modified
+            'lineref': '',
+            'sub': 'Say',  # Never modified
+            'islearning': 1,  # Never modified
+            'cleanslate': False,  # Never modified
+        }
+
+        # the log of our conversation with Cleverbot
+        self.conversation = []
+
+        # get the main page to get a cookie (see bug #13)
+        self.session = requests.Session()
+        self.session.get(Cleverbot.PROTOCOL + Cleverbot.HOST)
+
+    def ask(self, question):
+        """Asks Cleverbot a question.
+
+        Maintains message history.
+
+        :param question: The question to ask
+        :return Cleverbot's answer
+        """
+
+        # Set the current question
+        self.data['stimulus'] = question
+
+        # Connect to Cleverbot's API and remember the response
+        resp = self._send()
+
+        # Add the current question to the conversation log
+        self.conversation.append(question)
+
+        parsed = self._parse(resp.text)
+
+        # Set data as appropriate
+        if self.data['sessionid'] != '':
+            self.data['sessionid'] = parsed['conversation_id']
+
+        # Add Cleverbot's reply to the conversation log
+        self.conversation.append(parsed['answer'])
+
+        return parsed['answer']
+
+    def _send(self):
+        """POST the user's question and all required information to the
+        Cleverbot API
+
+        Cleverbot tries to prevent unauthorized access to its API by
+        obfuscating how it generates the 'icognocheck' token. The token is
+        currently the md5 checksum of the 10th through 36th characters of the
+        encoded data. This may change in the future.
+
+        TODO: Order is not guaranteed when urlencoding dicts. This hasn't been
+        a problem yet, but let's look into ordered dicts or tuples instead.
+        """
+        # Set data as appropriate
+        if self.conversation:
+            linecount = 1
+            for line in reversed(self.conversation):
+                linecount += 1
+                self.data['vText' + str(linecount)] = line
+                if linecount == 8:
+                    break
+
+        # Generate the token
+        enc_data = urlencode(self.data)
+        digest_txt = enc_data[9:35]
+        token = hashlib.md5(digest_txt.encode('utf-8')).hexdigest()
+        self.data['icognocheck'] = token
+
+        # POST the data to Cleverbot's API and return
+        return self.session.post(Cleverbot.API_URL,
+                                 data=self.data,
+                                 headers=Cleverbot.headers)
+
+    @staticmethod
+    def _parse(resp_text):
+        """Parses Cleverbot's response"""
+        resp_text = entity_parser.unescape(resp_text)
+
+        parsed = [
+            item.split('\r') for item in resp_text.split('\r\r\r\r\r\r')[:-1]
+            ]
+
+        if parsed[0][1] == 'DENIED':
+            raise CleverbotAPIError()
+
+        parsed_dict = {
+            'answer': parsed[0][0],
+            'conversation_id': parsed[0][1],
+            'conversation_log_id': parsed[0][2],
+        }
+        try:
+            parsed_dict['unknown'] = parsed[1][-1]
+        except IndexError:
+            parsed_dict['unknown'] = None
+        return parsed_dict
 
 
+class CleverbotAPIError(Exception):
+    """Cleverbot returned an error (it probably recognized us as a bot)"""
