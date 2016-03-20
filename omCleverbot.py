@@ -11,11 +11,12 @@
 
 import time, urllib, urllib2, cleverbot, simplejson
 import sys
+from colorama import *
 
-def log(message):
+def log(message, name="[LOG]", color=Fore.GREEN):
 	message = unicode(message)
-	print(message)
-	convLog.write(message + '\n')
+	print(color + name + Style.RESET_ALL + ": " + message)
+	convLog.write(name + ": " + message + '\n')
 	convLog.flush()
 
 def typing(id):
@@ -28,7 +29,7 @@ def sendMessage(id, msg):
 	try:
 		msgReq = urllib2.urlopen('http://omegle.com/send', '&msg='+msg+'&id='+id)
 		msgReq.close()
-		log ('CleverBot: ' + msg)
+		log (msg, 'CleverBot', Fore.BLUE)
 	except: pass
 
 def pollEvents(id, events):
@@ -44,7 +45,7 @@ def pollEvents(id, events):
 			omegle.close()
 			eventsJson = simplejson.loads(data)
 		except:
-			log('Hmm... Something went wrong...')
+			log('Hmm... Something went wrong...', Fore.RED)
 			break
 		
 		# print data 						# uncomment if you want the to see the raw response
@@ -55,8 +56,9 @@ def pollEvents(id, events):
 
 			if json[0] == 'connected':
 				log("Connected!")
-				seed = 'Hello!' 			# make this a random selection
-				if len(sys.argv[1]) > 0:
+				if len(sys.argv) < 2:
+					seed = cb.think()			# make this a random selection
+				else:
 					seed = sys.argv[1]
 				sendMessage(id, seed)
 				#cb.Ask(seed)
@@ -68,7 +70,7 @@ def pollEvents(id, events):
 			elif json[0] == 'gotMessage':
 				
 				incomingMsg = json[1]
-				log('Omegle User: ' + incomingMsg)
+				log(incomingMsg,'Omegle User', Fore.RED)
 				
 				# respond
 				try:
@@ -82,11 +84,11 @@ def pollEvents(id, events):
 				lastMessage = time.time()
 			
 			elif json[0] == 'strangerDisconnected':
-				log('Omegle User has disconnected.')
+				log('Omegle User has disconnected.', color=Fore.YELLOW)
 				break
 				
 		if time.time() - lastMessage > 60:
-			log("Idle timeout, disconnecting")
+			log("Idle timeout, disconnecting", color=Fore.YELLOW)
 			break
 		
 def omegleConnect():

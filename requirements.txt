@@ -1,0 +1,4 @@
+colorama
+simplejson
+future
+requests

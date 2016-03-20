@@ -100,6 +100,18 @@ class Cleverbot(object):
 
         return parsed['answer']
 
+    def think(self):
+        self.data['stimulus'] = '{pass}'
+        self.data['sub'] = 'Pass'
+        resp = self._send()
+        parsed = self._parse(resp.text)
+        if self.data['sessionid'] != '':
+            self.data['sessionid'] = parsed['conversation_id']
+        self.conversation.append(parsed['answer'])
+        self.data['stimulus'] = ''
+        self.data['sub'] = 'Say'
+        return parsed['answer']
+
     def _send(self):
         """POST the user's question and all required information to the
         Cleverbot API
