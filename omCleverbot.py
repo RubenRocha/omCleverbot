@@ -10,8 +10,10 @@
 # Email me any interesting conversations or things you build on this :-)
 
 import time, urllib, urllib2, cleverbot, simplejson
+import sys
 
 def log(message):
+	message = unicode(message)
 	print(message)
 	convLog.write(message + '\n')
 	convLog.flush()
@@ -54,6 +56,8 @@ def pollEvents(id, events):
 			if json[0] == 'connected':
 				log("Connected!")
 				seed = 'Hello!' 			# make this a random selection
+				if len(sys.argv[1]) > 0:
+					seed = sys.argv[1]
 				sendMessage(id, seed)
 				#cb.Ask(seed)
 
