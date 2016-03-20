@@ -9,7 +9,7 @@ Omegle/Cleverbot might end up banning your IP if you start too many sessions. Do
 cleverboy.py was taken from https://github.com/folz/cleverbot.py
 
 ### New:
-You can now choose the seed to start with (defaults to "Hello!"), by setting the first argument to whatever you want. 
+You can now choose the seed to start with (defaults to cleverbot thinking), by setting the first argument to whatever you want. 
 
 e.g:
 `./omCleverbot.py Ahoy!`
